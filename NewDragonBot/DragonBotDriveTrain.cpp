@@ -52,8 +52,8 @@ class DragonBotDriveTrain : public IterativeRobot
 	//static const float JAWHEAD_MOTOR_SPEED = 0.2f;
 	
 	RobotDrive * drive;
-	Gamepad * gamepad;
-	Gamepad * gamepad2;
+	Gamepad * pilot;
+	Gamepad * copilot;
 	DriverStationLCD * lcd;
 	Victor * smoke_cannon;	
 	DigitalOutput * smoke_machine;
@@ -104,8 +104,8 @@ public:
 		//left_eye_y = new Servo(LEFT_EYE_Y_PWM);
 		right_eye_x = new Servo(RIGHT_EYE_X_PWM);
 		//right_eye_y = new Servo(RIGHT_EYE_Y_PWM);
-		gamepad = new Gamepad(1);
-		gamepad2 = new Gamepad(2);
+		pilot = new Gamepad(1);
+		copilot = new Gamepad(2);
 		smoke_machine = new DigitalOutput(SMOKE_MACHINE_RELAY);
 		lcd = DriverStationLCD::GetInstance();
 		jaw_motor = new Victor(JAW_MOTOR_PWM);
@@ -154,38 +154,31 @@ public:
 		
 	}
 
+	float adjust_input(float in) {
+		if (fabs(in) < 0.1){
+			return 0.0;
+		}
+		else return SPEED_LIMIT * in;
+	}
 	
 	void TeleopPeriodic(void) {
-		float x = gamepad->GetLeftX();
-		float y = gamepad->GetLeftY();
-		float rot = gamepad->GetRightX();
-		
-		//small gamepad values are ignored
-		if (x < 0.1f && x > -0.1f)
-			{
-				x = 0;
-			}
-		if (y < 0.1f && y > -0.1f)
-			{
-				y = 0;
-			}
-		
-		if (rot < 0.1f && rot > -0.1f)
-			{
-				rot = 0;
-			}
-		
-		drive->MecanumDrive_Cartesian(SPEED_LIMIT * x, SPEED_LIMIT * y, SPEED_LIMIT * rot);
+		float x = adjust_input(pilot->GetLeftX());
+		float y = adjust_input(pilot->GetLeftY());
+		float rot = adjust_input(pilot->GetRightX());
+
+		drive->MecanumDrive_Cartesian(x, y, rot);
 		
 		//shoot smoke if button is pressed
-		if (gamepad2->GetNumberedButton(FIRE_SMOKE_BUTTON)){
+		if (copilot->GetNumberedButton(FIRE_SMOKE_BUTTON)){
 			//SHOOT SMOKE!
-			//makingSmoke = !makingSmoke;
 			smoke_cannon->Set(SMOKE_CANNON_SPEED);
 			lcd->PrintfLine(DriverStationLCD::kUser_Line5, "Shooting");
 				
-			firing_smoke_timer->Start(); //measure how long we've fired smoke, so we know if it's ok to make more
-			
+			if (making_smoke_timer->Get() > firing_smoke_timer->Get()){
+				firing_smoke_timer->Start(); //measure how long we've fired smoke, so we know if it's ok to make more
+			} else {
+				firing_smoke_timer->Stop();
+			}
 		}
 		else
 		{
@@ -195,85 +188,9 @@ public:
 										//don't reset, cuz we need to how much smoke we've fired.
 
 		}
-		//Eye Code
 		
-//		float eye_pos = gamepad2->GetLeftX();
-//		
-//		right_eye_x->Set((eye_pos * 60) + default_eye_position);
-//		left_eye_x->Set((eye_pos * 60) + default_eye_position - LEFT_EYE_OFFSET);
-//		
-//		//button lock code
-//		if(gamepad2->GetNumberedButtonPressed(EYE_LOCK_BUTTON)){
-//			default_eye_position = eye_pos;
-//		}
-//		
-		
-		
-		//left eye control
-		//If A isn't pressed the value should stay the same as before
-		if (!gamepad2->GetNumberedButton(1)){
-			float left_joystick_x = gamepad2->GetLeftX();
-			float left_eye_x_axis = (1 - left_joystick_x)*60;
-			left_eye_val = left_eye_x_axis + 50;
-			
-			float right_joystick_x = gamepad2->GetRawAxis(4);//right x axis
-			float right_eye_x_axis = (1-right_joystick_x)*60;
-			right_eye_val = right_eye_x_axis+20;
-		}
-		left_eye_x->SetAngle(left_eye_val);		
-		right_eye_x->SetAngle(right_eye_val);
-		
-		//float right_joystick_y = gamepad2->GetRawAxis(4);
-		//float right_eye_y_axis = (right_joystick_y+1)*60;
-		//right_eye_y->SetAngle(right_eye_y_axis);
-
-		/*
-		bool rbutton = gamepad2->GetNumberedButton(HEAD_UP_BUTTON);
-		bool lbutton = gamepad2->Ge tNumberedButton(HEAD_DOWN_BUTTON);
-		if (rbutton){
-			lcd->PrintfLine(DriverStationLCD::kUser_Line6, "rb pressed");
-			jaw_motor->Set(0.2f);
-		}else if(lbutton){
-			lcd->PrintfLine(DriverStationLCD::kUser_Line6, "lb pressed");
-			jaw_motor->Set(-0.15f);
-		}else{
-			lcd->PrintfLine(DriverStationLCD::kUser_Line6, "no buttons");
-			jaw_motor->Set(0.0f);
-		}
-		*/
-
-		//REAL head & jaw code
-		//move head down
-		if(gamepad2->GetRightX()<=-0.5f && can_move_head_down() && can_move_jaw_down()){
-			head_motor->Set(-0.3f);
-			jaw_motor->Set(0.3f);
-		}
-		//move head up
-		else if(gamepad2->GetNumberedButton(HEAD_UP_BUTTON) && can_move_head_up()){
-			head_motor->Set(0.3f);
-			jaw_motor->Set(-0.3f);
-		}
-		//move jaw down
-		else if(gamepad2->GetRightX()>=0.5f && can_move_jaw_down()){
-			jaw_motor->Set(0.3f);
-		}
-		//move jaw up
-		else if(gamepad2->GetNumberedButton(JAW_UP_BUTTON) && can_move_jaw_up()){
-			jaw_motor->Set(-0.3f);
-		}
-		//sets to zero if no buttons pressed
-		else {
-			jaw_motor->Set(0.0f);
-			head_motor->Set(0.0f);
-		}
-		
-		
-		lcd->PrintfLine(DriverStationLCD::kUser_Line6, "b:%d t:%d c:%d", bottomjaw_limit->Get(), tophead_limit->Get(), crash_limit->Get());
-		
-		
-
 		//Smoke code
-		if (gamepad2->GetNumberedButton(MAKE_SMOKE_BUTTON)){
+		if (copilot->GetNumberedButton(MAKE_SMOKE_BUTTON)){
 			//MAKE SMOKE!!!!!!!!!!!
 			//only if we don't have too much excess smoke
 			if (making_smoke_timer->Get() - firing_smoke_timer->Get() < MAX_EXCESS_SMOKE_TIME){
@@ -299,6 +216,47 @@ public:
 			making_smoke_timer->Reset();
 			firing_smoke_timer->Reset();
 		}
+		
+		//left eye control
+		//If A isn't pressed the value should stay the same as before
+		if (!copilot->GetNumberedButton(1)){
+			float left_joystick_x = copilot->GetLeftX();
+			float left_eye_x_axis = (1 - left_joystick_x)*60;
+			left_eye_val = left_eye_x_axis + 50;
+			
+			float right_joystick_x = copilot->GetRawAxis(4);//right x axis
+			float right_eye_x_axis = (1-right_joystick_x)*60;
+			right_eye_val = right_eye_x_axis+20;
+		}
+		left_eye_x->SetAngle(left_eye_val);		
+		right_eye_x->SetAngle(right_eye_val);
+		
+		//move head down
+		if(copilot->GetRightX()<=-0.5f && can_move_head_down() && can_move_jaw_down()){
+			head_motor->Set(-0.3f);
+			jaw_motor->Set(0.3f);
+		}
+		//move head up
+		else if(copilot->GetNumberedButton(HEAD_UP_BUTTON) && can_move_head_up()){
+			head_motor->Set(0.3f);
+			jaw_motor->Set(-0.3f);
+		}
+		//move jaw down
+		else if(copilot->GetRightX()>=0.5f && can_move_jaw_down()){
+			jaw_motor->Set(0.3f);
+		}
+		//move jaw up
+		else if(copilot->GetNumberedButton(JAW_UP_BUTTON) && can_move_jaw_up()){
+			jaw_motor->Set(-0.3f);
+		}
+		//sets to zero if no buttons pressed
+		else {
+			jaw_motor->Set(0.0f);
+			head_motor->Set(0.0f);
+		}
+		
+		
+		lcd->PrintfLine(DriverStationLCD::kUser_Line6, "b:%d t:%d c:%d", bottomjaw_limit->Get(), tophead_limit->Get(), crash_limit->Get());
 		
 		lcd->PrintfLine(DriverStationLCD::kUser_Line1, "x:%f", x);
 		lcd->PrintfLine(DriverStationLCD::kUser_Line2, "y:%f", y);
