@@ -1,8 +1,4 @@
 NewDragonBot/PPC603gnu/*
-NewDragonBot/.cproject
-NewDragonBot/.project
-NewDragonBot/.wrmakefile
-NewDragonBot/.wrproject
 
 *.py[cod]
 
