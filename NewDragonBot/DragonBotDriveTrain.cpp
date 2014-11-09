@@ -16,6 +16,7 @@
 #include "WPILib.h"
 #include "Gamepad.h"
 #include "Relay.h"
+#include <cmath>
 
 class DragonBotDriveTrain : public IterativeRobot
 {
@@ -42,6 +43,7 @@ class DragonBotDriveTrain : public IterativeRobot
 	static const int MAKE_SMOKE_BUTTON = 4;
 	static const int HEAD_UP_BUTTON = 6; //right bumper
 	static const int JAW_UP_BUTTON = 5; //left bumper
+	static const int BACKUP_JAW_UP = 7; //backup jaw button for broken controller
 	static const int EYE_LOCK_BUTTON = 1; 
 	static const float LEFT_EYE_OFFSET = 0.0f; //TODO: figure this out
 	float default_eye_position;
@@ -180,7 +182,7 @@ public:
 				firing_smoke_timer->Stop();
 			}
 		}
-		else
+		else                  
 		{
 			smoke_cannon->Set(0.0f);
 			lcd->PrintfLine(DriverStationLCD::kUser_Line5, "Not shooting");
@@ -234,20 +236,20 @@ public:
 		//move head down
 		if(copilot->GetRightX()<=-0.5f && can_move_head_down() && can_move_jaw_down()){
 			head_motor->Set(-0.3f);
-			jaw_motor->Set(0.3f);
+			jaw_motor->Set(0.2f);
 		}
 		//move head up
 		else if(copilot->GetNumberedButton(HEAD_UP_BUTTON) && can_move_head_up()){
-			head_motor->Set(0.3f);
-			jaw_motor->Set(-0.3f);
+			head_motor->Set(0.5f);
+			jaw_motor->Set(-0.4);
 		}
 		//move jaw down
 		else if(copilot->GetRightX()>=0.5f && can_move_jaw_down()){
-			jaw_motor->Set(0.3f);
+			jaw_motor->Set(0.4f);
 		}
 		//move jaw up
-		else if(copilot->GetNumberedButton(JAW_UP_BUTTON) && can_move_jaw_up()){
-			jaw_motor->Set(-0.3f);
+		else if((copilot->GetNumberedButton(JAW_UP_BUTTON) || copilot->GetNumberedButton(BACKUP_JAW_UP)) && can_move_jaw_up()){
+			jaw_motor->Set(-0.4f);
 		}
 		//sets to zero if no buttons pressed
 		else {
